@@ -1,0 +1,53 @@
+module shatb();
+reg [31:0]input_data;    // 32-bit input data for SHA-256
+reg input_valid;         // Flag indicating valid input data
+reg last_word;           // Flag indicating the last word in the input
+reg [6:0]blocks;         // Counter for the number of blocks processed
+reg clk;                 // Clock signal
+reg rst;                 // Reset signal
+wire [255:0]hash_data;   // 256-bit hash output from SHA-256
+wire output_valid;       // Flag indicating hash computation is complete
+integer fd,scan_file;    // File descriptor and variable for reading input
+
+// Initial block: Sets up initial conditions
+initial begin
+    clk = 1'b0;           // Initialize clock to 0
+    last_word = 1'b0;     // Set last_word flag to 0 initially
+    input_valid = 1'b1;   // Mark input as valid
+    blocks = 0;          // Initialize block counter
+    fd = $fopen("C:/Users/HP/Desktop/my_file.txt","r");  // Open input file for reading
+    rst = 1'b1;          // Activate reset
+    #2;                  // Wait for 2 time units
+    rst = 1'b0;          // Release reset
+end
+
+// Instantiate the SHA-256 module
+sha256 uut(
+    input_data,        // Input data to the SHA-256 module
+    input_valid,       // Input valid signal
+    input_ready,       // Input ready signal from SHA-256 module
+    last_word,         // Last word flag
+    clk,               // Clock signal
+    rst,               // Reset signal
+    output_valid,      // Output valid signal
+    hash_data          // 256-bit hash output
+);
+
+// Generate clock: Toggles based on output_valid status
+always #10 clk = (~output_valid) ^ clk;
+
+// Read input data from file when SHA-256 is ready for new data
+always @(posedge clk) begin
+    if(input_ready == 1'b1 && last_word == 1'b0) begin
+        scan_file = $fscanf(fd, "%x\n", input_data);  // Read next 32-bit word from file
+        blocks <= blocks + 1;  // Increment block count
+    end
+end
+
+// Detect last word condition
+always @(blocks) begin
+    if(blocks == 24)  // If 24 blocks have been read, set last_word flag
+        last_word = 1'b1;
+end
+
+endmodule
